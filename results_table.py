@@ -64,7 +64,7 @@ class ResultsTable():
             )
             for k, v in replace_dict.items():
                 res = res.replace(k, v)
-            f.write('\\resizebox{\\columnwidth}{!}{%\n')
+            f.write('\\resizebox{\\textwidth}{!}{%\n')
             f.write(res)
             f.write('}')
             f.write('\n')
