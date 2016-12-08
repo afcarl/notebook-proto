@@ -19,3 +19,8 @@ def from_logits_file(filename):
     softmax = exp_logits / coeff[:, np.newaxis]
 
     return Model(Data(features, logits, softmax, labels))
+
+def load(filename, binary=False):
+    cls = BinaryModel if binary else Model
+    data = np.load(filename)
+    return cls(namedtuple('GenericDict', data.keys())(**data))

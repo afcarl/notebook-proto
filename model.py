@@ -53,3 +53,17 @@ class Model(namedtuple('Model', 'data')):
             'Calib. (d=0.1):\t%.3f' % self.calibration(delta=0.1),
         ])
 
+class BinaryModel(Model):
+    def overconfidence(self):
+        return self.data.softmax.mean() - self.data.label.mean()
+
+    def confidences(self):
+        return self.data.softmax
+
+    def predictions(self):
+        return self.data.softmax > 0.5
+
+    def bin_accuracies(self, delta=.1):
+        bins, all_hist = self.bin_sizes(delta)
+        correct_hist, _ = np.histogram(self.confidences()[self.accuracies()], bins=bins)
+        return bins, correct_hist / (all_hist + 1e-6)
