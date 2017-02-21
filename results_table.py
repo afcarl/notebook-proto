@@ -2,9 +2,46 @@ import re
 import numpy as np
 import pandas as pd
 from operator import methodcaller
+from collections import namedtuple
+pd.set_option('display.multi_sparse', False)
+
+class Exp(namedtuple('Exp', 'dataset model')):
+    def col_name(self):
+        return '%s' % (self.model)
 
 class ResultsTable():
-    def __init__(self, data, methods, exps, best='max', perc=True):
+    def __init__(self, table):
+        self.table = table
+
+    @classmethod
+    def from_table(cls, table, best='min'):
+	def try_float(a):
+	    try:
+		return float(a)
+	    except:
+                if best == 'min':
+                    return np.inf
+                else:
+                    return -np.inf
+	    
+	try_float_v = np.vectorize(try_float)
+	res = try_float_v(table.as_matrix())
+
+        if best == 'min':
+            best_indices = np.argmin(res, axis=1)
+        else:
+            best_indices = np.argmax(res, axis=1)
+
+        for i, best_index in enumerate(best_indices):
+            res = table[table.columns[best_index]][table.index[i]]
+            if '---' not in res:
+                table[table.columns[best_index]][table.index[i]] = '<' + res + '>'
+
+        return cls(table)
+        
+
+    @classmethod
+    def from_data(cls, data, methods, exps, col_name, best='min', perc=True):
         if perc:
             make_res = np.vectorize(lambda mean, std: ('%.1f' % mean).lstrip('0') + '% +/- ' + ('%.1f' % std).lstrip('0') + '%')
             make_res_no_stdv = np.vectorize(lambda mean: ('%.1f' % mean).lstrip('0') + '%')
@@ -47,17 +84,24 @@ class ResultsTable():
         for divider_index in divider_indices:
             res_table.insert(divider_index, ['---'] * len(exps))
                 
-        self.table = pd.DataFrame(res_table, columns=map(methodcaller('col_name'), exps), index=methods)
+        table = pd.DataFrame(res_table, columns=map(methodcaller('col_name'), exps), index=methods)
+        return cls(table)
 
     def to_latex(self, filename, replace_dict={}):  
         num_columns = len(self.table.columns)
-        column_format = 'p{0.25\\textwidth}' + ' '.join(['p{0.20\\textwidth}' for _ in range(num_columns)])
+        index_size = len(self.table.index.names)
+        column_format = ' '.join(['c' for i in range(index_size)]) + ' ' + ' '.join(['c' for _ in range(num_columns)])
         with open(filename, 'w') as f:
-            res = self.table.to_latex(column_format=column_format)
+            res = self.table.reset_index(level=range(len(self.table.index.names))).to_latex(column_format=column_format, index=False)
             res = re.sub('---.+\\\\', '\midrule', res)
             res = (res.replace('[', '\\specialcell{')
                 .replace(']', '}')
+                .replace(r'\$', '$')
+                .replace(r'\_', '_')
+                .replace(r'\{', '{')
+                .replace(r'\}', '}')
                 .replace('->', '\\textrightarrow')
+                .replace('\\textbackslash', '\\')
                 .replace('<', '{\\bf')
                 .replace('>', '}')
                 .replace('+/-', '$\\pm$')
